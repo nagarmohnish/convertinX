@@ -1,0 +1,33 @@
+# INSTALL INSTRUCTIONS:
+# 1. python -m venv venv
+# 2. venv\Scripts\activate  (Windows) or source venv/bin/activate (Linux/Mac)
+# 3. pip install --upgrade pip "setuptools<71" wheel
+# 4. pip install -r requirements.txt
+# Note: setuptools<71 is required because openai-whisper uses pkg_resources
+
+# Web framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.18
+websockets==14.1
+
+# ML Models
+openai-whisper==20240930
+transformers==4.47.1
+torch==2.5.1
+sentencepiece==0.2.0
+protobuf==5.29.2
+
+# TTS
+edge-tts==7.2.7
+
+# Audio processing
+pydub==0.25.1
+
+# Language detection
+langdetect==1.0.9
+
+# Utilities
+pydantic-settings==2.7.0
+python-dotenv==1.0.1
+aiofiles==24.1.0
