@@ -1,10 +1,10 @@
 from langdetect import detect
+from app.utils.language_map import normalize_language
 
 
 def detect_language(text: str) -> str:
-    """Detect language from text. Returns ISO 639-1 code like 'en', 'es', 'fr'."""
+    """Detect language from text. Returns a supported language code."""
     code = detect(text)
-    # langdetect returns 'zh-cn'/'zh-tw' for Chinese, normalize to 'zh'
     if code.startswith("zh"):
         return "zh"
-    return code
+    return normalize_language(code)

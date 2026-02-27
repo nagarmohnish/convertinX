@@ -1,4 +1,9 @@
 import { useState, useRef, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Film, Headphones, FileText, X, RefreshCw,
+  CloudUpload, Sparkles, FileUp,
+} from "lucide-react";
 import type { ContentType } from "../types";
 
 const ALLOWED_EXTENSIONS: Record<ContentType, string[]> = {
@@ -20,24 +25,18 @@ function detectContentType(filename: string): ContentType | null {
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return bytes + " B";
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-  if (bytes < 1024 * 1024 * 1024)
-    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB";
 }
-
-const TYPE_STYLES: Record<ContentType, { bg: string; text: string; label: string }> = {
-  text: { bg: "bg-emerald-500/10", text: "text-emerald-400", label: "Text" },
-  audio: { bg: "bg-amber-500/10", text: "text-amber-400", label: "Audio" },
-  video: { bg: "bg-violet-500/10", text: "text-violet-400", label: "Video" },
-};
 
 interface UploadZoneProps {
   file: File | null;
   onFileSelect: (file: File) => void;
+  onFileClear?: () => void;
   disabled?: boolean;
 }
 
-export default function UploadZone({ file, onFileSelect, disabled }: UploadZoneProps) {
+export default function UploadZone({ file, onFileSelect, onFileClear, disabled }: UploadZoneProps) {
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -47,11 +46,11 @@ export default function UploadZone({ file, onFileSelect, disabled }: UploadZoneP
       setError(null);
       const type = detectContentType(f.name);
       if (!type) {
-        setError(`Unsupported file type. Allowed: ${ALL_EXTENSIONS.join(", ")}`);
+        setError("Unsupported format. Try MP4, MP3, WAV, TXT, or SRT files.");
         return;
       }
       if (f.size > 500 * 1024 * 1024) {
-        setError("File too large. Maximum size is 500 MB.");
+        setError("File exceeds 500 MB limit.");
         return;
       }
       onFileSelect(f);
@@ -70,86 +69,194 @@ export default function UploadZone({ file, onFileSelect, disabled }: UploadZoneP
     [handleFile, disabled],
   );
 
-  const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const f = e.target.files?.[0];
-      if (f) handleFile(f);
-    },
-    [handleFile],
-  );
+  const openFilePicker = () => {
+    if (!disabled) inputRef.current?.click();
+  };
 
   const contentType = file ? detectContentType(file.name) : null;
-  const typeStyle = contentType ? TYPE_STYLES[contentType] : null;
 
   return (
-    <div className="space-y-3">
-      <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          if (!disabled) setDragActive(true);
+    <div className="space-y-2.5">
+      <input
+        ref={inputRef}
+        type="file"
+        accept={ALL_EXTENSIONS.join(",")}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleFile(f);
+          e.target.value = "";
         }}
-        onDragLeave={() => setDragActive(false)}
-        onDrop={handleDrop}
-        onClick={() => !disabled && inputRef.current?.click()}
-        className={`
-          relative border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer
-          transition-all duration-200
-          ${disabled ? "opacity-50 cursor-not-allowed" : ""}
-          ${
-            dragActive
-              ? "border-violet-400 bg-violet-500/10"
-              : file
-                ? "border-slate-600 bg-slate-800/50"
-                : "border-slate-600 bg-slate-800/30 hover:border-slate-500 hover:bg-slate-800/50"
-          }
-        `}
-      >
-        <input
-          ref={inputRef}
-          type="file"
-          accept={ALL_EXTENSIONS.join(",")}
-          onChange={handleChange}
-          className="hidden"
-          disabled={disabled}
-        />
+        className="hidden"
+        disabled={disabled}
+      />
 
-        {file ? (
-          <div className="space-y-2">
-            <div className="flex items-center justify-center gap-2">
-              {typeStyle && (
-                <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${typeStyle.bg} ${typeStyle.text}`}>
-                  {typeStyle.label}
-                </span>
+      {file && contentType ? (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.97, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          className="group relative rounded-2xl bg-surface/80 border border-border hover:border-border-2 transition-colors overflow-hidden"
+        >
+          <div className="px-5 py-4 flex items-center gap-4">
+            <FileTypeIcon type={contentType} />
+            <div className="min-w-0 flex-1">
+              <p className="text-[14px] font-semibold text-text-1 truncate">{file.name}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[12px] text-text-3 font-mono">{formatFileSize(file.size)}</span>
+                <span className="w-1 h-1 rounded-full bg-text-4" />
+                <ContentBadge type={contentType} />
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={openFilePicker}
+                disabled={disabled}
+                className="flex items-center justify-center w-8 h-8 rounded-lg text-text-4 hover:text-text-2 hover:bg-surface-2 transition-all disabled:opacity-30"
+                title="Replace file"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+              {onFileClear && (
+                <button
+                  type="button"
+                  onClick={onFileClear}
+                  disabled={disabled}
+                  className="flex items-center justify-center w-8 h-8 rounded-lg text-text-4 hover:text-red hover:bg-red-muted transition-all disabled:opacity-30"
+                  title="Remove file"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               )}
             </div>
-            <p className="text-white font-medium">{file.name}</p>
-            <p className="text-sm text-slate-400">{formatFileSize(file.size)}</p>
-            <p className="text-xs text-slate-500">Click or drop to replace</p>
           </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-slate-700/50 flex items-center justify-center">
-              <svg className="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-slate-300 font-medium">
-                Drop your file here or click to browse
-              </p>
-              <p className="text-sm text-slate-500 mt-1">
-                Text, Audio, or Video files up to 500 MB
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
+          {/* Confirmation strip */}
+          <div className="h-0.5 bg-gradient-to-r from-transparent via-green/40 to-transparent" />
+        </motion.div>
+      ) : (
+        <div
+          onDragOver={(e) => { e.preventDefault(); if (!disabled) setDragActive(true); }}
+          onDragLeave={() => setDragActive(false)}
+          onDrop={handleDrop}
+          onClick={openFilePicker}
+          className={`
+            group relative rounded-2xl cursor-pointer transition-all duration-300 overflow-hidden
+            ${disabled ? "opacity-40 pointer-events-none" : ""}
+          `}
+        >
+          {/* Border / glow */}
+          <div className={`
+            absolute inset-0 rounded-2xl transition-all duration-500 pointer-events-none
+            ${dragActive
+              ? "bg-accent/[0.06] ring-2 ring-accent/30 ring-inset shadow-[inset_0_0_80px_rgba(139,92,246,0.06)]"
+              : "border border-dashed border-border-2 group-hover:border-text-4 group-hover:bg-surface/30"
+            }
+          `} />
 
-      {error && (
-        <p className="text-sm text-red-400 bg-red-500/10 rounded-lg px-4 py-2">
-          {error}
-        </p>
+          <div className="relative px-6 py-12 flex flex-col items-center text-center">
+            {/* Icon with pulse on drag */}
+            <div className="relative mb-5">
+              <div className={`
+                w-16 h-16 rounded-2xl flex items-center justify-center border transition-all duration-300
+                ${dragActive
+                  ? "bg-accent-muted border-accent/25 shadow-lg shadow-accent/10 scale-110"
+                  : "bg-surface-2 border-border group-hover:border-border-2 group-hover:bg-surface-3 group-hover:scale-105"
+                }
+              `}>
+                {dragActive ? (
+                  <FileUp className="w-7 h-7 text-accent-2" strokeWidth={1.5} />
+                ) : (
+                  <CloudUpload className="w-7 h-7 text-text-3 group-hover:text-text-2 transition-colors" strokeWidth={1.5} />
+                )}
+              </div>
+              {dragActive && (
+                <div className="absolute inset-0 rounded-2xl border-2 border-accent/30 animate-ping" />
+              )}
+            </div>
+
+            <p className="text-[15px] font-semibold text-text-1 mb-1.5">
+              {dragActive ? "Drop your file here" : "Drop a file or click to browse"}
+            </p>
+            <p className="text-[13px] text-text-4 mb-6 max-w-[280px]">
+              Upload video, audio, or text to translate into any language
+            </p>
+
+            {/* Format chips */}
+            <div className="flex items-center gap-2 flex-wrap justify-center">
+              <FormatChip icon={Film} label="MP4" color="accent" />
+              <FormatChip icon={Headphones} label="MP3" color="amber" />
+              <FormatChip icon={FileText} label="TXT" color="green" />
+              <span className="text-[11px] text-text-4 font-mono">+15 more</span>
+            </div>
+
+            <p className="mt-4 text-[11px] text-text-4 font-mono flex items-center gap-1.5">
+              <Sparkles className="w-3 h-3" />
+              Up to 500 MB
+            </p>
+          </div>
+        </div>
       )}
+
+      {/* Error */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-red-muted border border-red/10 text-[13px] text-red"
+          >
+            <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            {error}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function FormatChip({ icon: Icon, label, color }: { icon: typeof Film; label: string; color: string }) {
+  const colors: Record<string, string> = {
+    accent: "border-accent/15 text-accent-2",
+    amber: "border-amber/15 text-amber",
+    green: "border-green/15 text-green",
+  };
+  return (
+    <span className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-2/80 border text-[11px] font-semibold tracking-wider ${colors[color] ?? colors.accent}`}>
+      <Icon className="w-3 h-3" strokeWidth={1.5} />
+      {label}
+    </span>
+  );
+}
+
+function ContentBadge({ type }: { type: ContentType }) {
+  const config: Record<ContentType, { color: string; label: string }> = {
+    video: { color: "bg-accent/15 text-accent-2", label: "Video" },
+    audio: { color: "bg-amber/15 text-amber", label: "Audio" },
+    text: { color: "bg-green/15 text-green", label: "Text" },
+  };
+  const c = config[type];
+  return (
+    <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${c.color}`}>
+      {c.label}
+    </span>
+  );
+}
+
+function FileTypeIcon({ type }: { type: ContentType }) {
+  const config = {
+    text: { bg: "bg-green-muted", border: "border-green/15", color: "text-green", Icon: FileText },
+    audio: { bg: "bg-amber-muted", border: "border-amber/15", color: "text-amber", Icon: Headphones },
+    video: { bg: "bg-accent-muted", border: "border-accent/15", color: "text-accent-2", Icon: Film },
+  }[type];
+
+  return (
+    <div className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 ${config.bg} ${config.border}`}>
+      <config.Icon className={`w-5 h-5 ${config.color}`} strokeWidth={1.5} />
     </div>
   );
 }

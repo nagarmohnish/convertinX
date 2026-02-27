@@ -4,6 +4,7 @@ from app.models.model_manager import ModelManager
 from app.pipeline.progress import ProgressBroadcaster
 from app.services.transcription import transcribe_audio
 from app.services.translation import translate_text
+from app.utils.language_map import normalize_language
 from app.services.tts import generate_tts_for_segments
 from app.services.audio import merge_audio_segments
 
@@ -24,7 +25,7 @@ async def run_audio_pipeline(
         None, transcribe_audio, file_path, src_lang, model_manager
     )
 
-    detected_lang = segments["language"]
+    detected_lang = normalize_language(segments["language"])
     src_lang = src_lang or detected_lang
     await progress.broadcast(
         job_id, 0.25, "Transcription complete",

@@ -129,6 +129,21 @@ OPUS_DIRECT_PAIRS = {
 }
 
 
+def normalize_language(code: str) -> str:
+    """Map a Whisper-detected language code to our supported set.
+    Returns the code as-is if supported, otherwise falls back to 'en'."""
+    if code in LANGUAGES:
+        return code
+    # Common Whisper misdetections / unsupported language fallbacks
+    _ALIASES = {
+        "sn": "en", "id": "en", "ms": "en", "vi": "en", "th": "en",
+        "tr": "en", "ru": "en", "pl": "en", "nl": "en", "it": "en",
+        "cs": "en", "sv": "en", "ro": "en", "uk": "en", "el": "en",
+        "hu": "en", "da": "en", "fi": "en", "no": "en", "he": "en",
+    }
+    return _ALIASES.get(code, "en")
+
+
 def get_opus_codes(src: str, tgt: str) -> tuple[str, str]:
     """Convert language codes to Opus-MT specific codes."""
     src_opus = LANGUAGES[src]["opus_code"]

@@ -5,6 +5,7 @@ from app.pipeline.progress import ProgressBroadcaster
 from app.services.video import extract_audio, burn_subtitles_and_replace_audio
 from app.services.transcription import transcribe_audio
 from app.services.translation import translate_text
+from app.utils.language_map import normalize_language
 from app.services.tts import generate_tts_for_segments
 from app.services.audio import merge_audio_segments
 from app.services.subtitle import generate_ass_subtitles, generate_srt_subtitles
@@ -29,7 +30,7 @@ async def run_video_pipeline(
     segments = await asyncio.get_event_loop().run_in_executor(
         None, transcribe_audio, audio_path, src_lang, model_manager
     )
-    src_lang = src_lang or segments["language"]
+    src_lang = src_lang or normalize_language(segments["language"])
     await progress.broadcast(
         job_id, 0.20, "Transcription complete",
         f"Detected: {src_lang}, {len(segments['segments'])} segments"
