@@ -17,6 +17,7 @@ class ModelManager:
         self._translation_models: dict[str, tuple] = {}
         self._lock = threading.Lock()
         self._whisper_lock = threading.Lock()
+        self._whisper_use_lock = threading.Lock()  # prevents concurrent transcription
         self._demucs_lock = threading.Lock()
 
     def get_whisper(self):

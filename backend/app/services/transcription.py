@@ -6,6 +6,7 @@ def transcribe_audio(
 ) -> dict:
     """
     Transcribe audio with Whisper, returning segments with word-level timestamps.
+    Uses a lock to prevent concurrent transcription (Whisper's kv_cache is not thread-safe).
     """
     model = model_manager.get_whisper()
 
@@ -16,7 +17,8 @@ def transcribe_audio(
     if src_lang:
         options["language"] = src_lang
 
-    result = model.transcribe(file_path, **options)
+    with model_manager._whisper_use_lock:
+        result = model.transcribe(file_path, **options)
 
     segments = result.get("segments", [])
     duration = segments[-1]["end"] if segments else 0

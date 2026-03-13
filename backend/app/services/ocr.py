@@ -21,7 +21,7 @@ def get_reader(languages: list[str]) -> easyocr.Reader:
     """Get or create an EasyOCR reader for the given languages."""
     key = ",".join(sorted(languages))
     if key not in _reader_cache:
-        _reader_cache[key] = easyocr.Reader(languages, gpu=False)
+        _reader_cache[key] = easyocr.Reader(languages, gpu=False, verbose=False)
     return _reader_cache[key]
 
 
