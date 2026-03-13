@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, User, LogIn } from "lucide-react";
+import { Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 interface LayoutProps {
   children: ReactNode;
@@ -8,6 +10,8 @@ interface LayoutProps {
 }
 
 export default function Layout({ children, onBack }: LayoutProps) {
+  const { user, logout } = useAuth();
+
   return (
     <div className="min-h-screen relative noise-overlay">
       {/* Animated ambient background */}
@@ -31,15 +35,34 @@ export default function Layout({ children, onBack }: LayoutProps) {
                 <ArrowLeft className="w-4 h-4" />
               </motion.button>
             )}
-            <a href="#" onClick={onBack} className="flex items-center gap-2.5 group">
+            <Link to="/app" className="flex items-center gap-2.5 group">
               <span className="text-[15px] font-semibold text-text-1 tracking-[-0.02em] font-display">
                 Convertin<span className="text-accent">X</span>
               </span>
-            </a>
+            </Link>
           </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-2/50 border border-border">
-            <div className="w-1.5 h-1.5 rounded-full bg-green" />
-            <span className="text-[11px] font-medium text-text-3">Ready</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-2/50 border border-border">
+              <div className="w-1.5 h-1.5 rounded-full bg-green" />
+              <span className="text-[11px] font-medium text-text-3">Ready</span>
+            </div>
+            {user ? (
+              <button
+                onClick={logout}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] text-text-3 hover:text-text-1 hover:bg-surface-2/50 transition-colors"
+              >
+                <User className="w-3.5 h-3.5" />
+                {user.display_name}
+              </button>
+            ) : (
+              <Link
+                to="/login"
+                className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-accent/10 text-accent-2 text-[12px] font-semibold hover:bg-accent/20 transition-colors"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                Sign in
+              </Link>
+            )}
           </div>
         </div>
       </header>

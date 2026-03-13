@@ -10,9 +10,13 @@ router = APIRouter()
 
 @router.get("/jobs/{job_id}")
 async def get_job(job_id: str):
-    """Get the status of a job."""
+    """Get the status of a job. Checks active jobs first, then DB."""
     orchestrator = get_orchestrator()
+    # Check active (in-memory) jobs first
     job = orchestrator.get_job(job_id)
+    if not job:
+        # Fall back to DB for completed/historical jobs
+        job = await orchestrator.get_job_from_db(job_id)
     if not job:
         raise HTTPException(404, "Job not found")
     return job.model_dump()
@@ -23,6 +27,8 @@ async def download_file(job_id: str, lang: str, file_type: str):
     """Download a specific output file from a completed job."""
     orchestrator = get_orchestrator()
     job = orchestrator.get_job(job_id)
+    if not job:
+        job = await orchestrator.get_job_from_db(job_id)
     if not job:
         raise HTTPException(404, "Job not found")
 

@@ -106,12 +106,13 @@ def _compute_rate_string(text: str, target_duration: float) -> str:
 
 def _speed_up_audio(tmp_path: str, duration_ratio: float) -> str:
     """Speed up audio using FFmpeg atempo filter."""
+    from app.config import settings
     adjusted_path = tempfile.mktemp(suffix=".mp3")
     atempo = min(duration_ratio, 2.0)
 
     subprocess.run(
         [
-            "ffmpeg", "-y", "-i", tmp_path,
+            settings.ffmpeg_path, "-y", "-i", tmp_path,
             "-filter:a", f"atempo={atempo}",
             "-loglevel", "error",
             adjusted_path,

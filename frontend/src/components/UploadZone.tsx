@@ -2,22 +2,28 @@ import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Film, Headphones, FileText, X, RefreshCw,
-  CloudUpload, Sparkles, FileUp,
+  CloudUpload, Sparkles, FileUp, Image, FileIcon,
 } from "lucide-react";
 import type { ContentType } from "../types";
 
-const ALLOWED_EXTENSIONS: Record<ContentType, string[]> = {
+const EXTENSIONS_BY_TYPE: Record<string, string[]> = {
   text: [".txt", ".srt", ".vtt", ".md", ".html", ".json"],
   audio: [".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac"],
   video: [".mp4", ".mov", ".avi", ".mkv", ".webm"],
+  document: [".pdf", ".docx", ".doc", ".pptx", ".ppt"],
+  image: [".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff"],
 };
 
-const ALL_EXTENSIONS = Object.values(ALLOWED_EXTENSIONS).flat();
+const DEFAULT_ACCEPT = ["audio", "video", "text"];
 
-function detectContentType(filename: string): ContentType | null {
+function getExtensions(types: string[]): string[] {
+  return types.flatMap((t) => EXTENSIONS_BY_TYPE[t] || []);
+}
+
+function detectContentType(filename: string, allowedTypes: string[]): ContentType | null {
   const ext = "." + filename.split(".").pop()?.toLowerCase();
-  for (const [type, exts] of Object.entries(ALLOWED_EXTENSIONS)) {
-    if (exts.includes(ext)) return type as ContentType;
+  for (const type of allowedTypes) {
+    if (EXTENSIONS_BY_TYPE[type]?.includes(ext)) return type as ContentType;
   }
   return null;
 }
@@ -29,24 +35,76 @@ function formatFileSize(bytes: number): string {
   return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB";
 }
 
+/** Presets for different tool pages */
+export const UPLOAD_PRESETS = {
+  translate: {
+    acceptTypes: ["audio", "video", "text"],
+    description: "Upload video, audio, or text to translate into any language",
+    chips: [
+      { label: "MP4", color: "accent" },
+      { label: "MP3", color: "amber" },
+      { label: "TXT", color: "green" },
+    ],
+    errorHint: "Try MP4, MP3, WAV, TXT, or SRT files.",
+  },
+  audio: {
+    acceptTypes: ["audio"],
+    description: "Upload an audio file",
+    chips: [
+      { label: "MP3", color: "amber" },
+      { label: "WAV", color: "green" },
+      { label: "FLAC", color: "accent" },
+    ],
+    errorHint: "Try MP3, WAV, OGG, FLAC, or M4A files.",
+  },
+  document: {
+    acceptTypes: ["document"],
+    description: "Upload a PDF, Word, or PowerPoint document",
+    chips: [
+      { label: "PDF", color: "accent" },
+      { label: "DOCX", color: "amber" },
+      { label: "PPTX", color: "green" },
+    ],
+    errorHint: "Try PDF, DOCX, or PPTX files.",
+  },
+  image: {
+    acceptTypes: ["image"],
+    description: "Upload an image with text to extract",
+    chips: [
+      { label: "PNG", color: "accent" },
+      { label: "JPG", color: "amber" },
+      { label: "WebP", color: "green" },
+    ],
+    errorHint: "Try PNG, JPG, or WebP files.",
+  },
+} as const;
+
+export type UploadPreset = keyof typeof UPLOAD_PRESETS;
+
 interface UploadZoneProps {
   file: File | null;
   onFileSelect: (file: File) => void;
   onFileClear?: () => void;
   disabled?: boolean;
+  /** Use a preset to configure accepted types, description, chips */
+  preset?: UploadPreset;
 }
 
-export default function UploadZone({ file, onFileSelect, onFileClear, disabled }: UploadZoneProps) {
+export default function UploadZone({ file, onFileSelect, onFileClear, disabled, preset }: UploadZoneProps) {
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const config = preset ? UPLOAD_PRESETS[preset] : UPLOAD_PRESETS.translate;
+  const allowedTypes = config.acceptTypes as unknown as string[];
+  const extensions = getExtensions(allowedTypes);
+
   const handleFile = useCallback(
     (f: File) => {
       setError(null);
-      const type = detectContentType(f.name);
+      const type = detectContentType(f.name, allowedTypes);
       if (!type) {
-        setError("Unsupported format. Try MP4, MP3, WAV, TXT, or SRT files.");
+        setError(`Unsupported format. ${config.errorHint}`);
         return;
       }
       if (f.size > 500 * 1024 * 1024) {
@@ -55,7 +113,7 @@ export default function UploadZone({ file, onFileSelect, onFileClear, disabled }
       }
       onFileSelect(f);
     },
-    [onFileSelect],
+    [onFileSelect, allowedTypes, config.errorHint],
   );
 
   const handleDrop = useCallback(
@@ -73,14 +131,14 @@ export default function UploadZone({ file, onFileSelect, onFileClear, disabled }
     if (!disabled) inputRef.current?.click();
   };
 
-  const contentType = file ? detectContentType(file.name) : null;
+  const contentType = file ? detectContentType(file.name, allowedTypes) : null;
 
   return (
     <div className="space-y-2.5">
       <input
         ref={inputRef}
         type="file"
-        accept={ALL_EXTENSIONS.join(",")}
+        accept={extensions.join(",")}
         onChange={(e) => {
           const f = e.target.files?.[0];
           if (f) handleFile(f);
@@ -178,15 +236,19 @@ export default function UploadZone({ file, onFileSelect, onFileClear, disabled }
               {dragActive ? "Drop your file here" : "Drop a file or click to browse"}
             </p>
             <p className="text-[13px] text-text-4 mb-6 max-w-[280px]">
-              Upload video, audio, or text to translate into any language
+              {config.description}
             </p>
 
             {/* Format chips */}
             <div className="flex items-center gap-2 flex-wrap justify-center">
-              <FormatChip icon={Film} label="MP4" color="accent" />
-              <FormatChip icon={Headphones} label="MP3" color="amber" />
-              <FormatChip icon={FileText} label="TXT" color="green" />
-              <span className="text-[11px] text-text-4 font-mono">+15 more</span>
+              {config.chips.map((chip) => (
+                <FormatChip key={chip.label} icon={FileIcon} label={chip.label} color={chip.color} />
+              ))}
+              {extensions.length > 3 && (
+                <span className="text-[11px] text-text-4 font-mono">
+                  +{extensions.length - 3} more
+                </span>
+              )}
             </div>
 
             <p className="mt-4 text-[11px] text-text-4 font-mono flex items-center gap-1.5">
@@ -224,6 +286,7 @@ function FormatChip({ icon: Icon, label, color }: { icon: typeof Film; label: st
     accent: "border-accent/15 text-accent-2",
     amber: "border-amber/15 text-amber",
     green: "border-green/15 text-green",
+    cyan: "border-cyan/15 text-cyan",
   };
   return (
     <span className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-2/80 border text-[11px] font-semibold tracking-wider ${colors[color] ?? colors.accent}`}>
@@ -234,12 +297,14 @@ function FormatChip({ icon: Icon, label, color }: { icon: typeof Film; label: st
 }
 
 function ContentBadge({ type }: { type: ContentType }) {
-  const config: Record<ContentType, { color: string; label: string }> = {
+  const config: Record<string, { color: string; label: string }> = {
     video: { color: "bg-accent/15 text-accent-2", label: "Video" },
     audio: { color: "bg-amber/15 text-amber", label: "Audio" },
     text: { color: "bg-green/15 text-green", label: "Text" },
+    document: { color: "bg-cyan/15 text-cyan", label: "Document" },
+    image: { color: "bg-amber/15 text-amber", label: "Image" },
   };
-  const c = config[type];
+  const c = config[type] || config.text;
   return (
     <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${c.color}`}>
       {c.label}
@@ -248,15 +313,18 @@ function ContentBadge({ type }: { type: ContentType }) {
 }
 
 function FileTypeIcon({ type }: { type: ContentType }) {
-  const config = {
+  const config: Record<string, { bg: string; border: string; color: string; Icon: typeof Film }> = {
     text: { bg: "bg-green-muted", border: "border-green/15", color: "text-green", Icon: FileText },
     audio: { bg: "bg-amber-muted", border: "border-amber/15", color: "text-amber", Icon: Headphones },
     video: { bg: "bg-accent-muted", border: "border-accent/15", color: "text-accent-2", Icon: Film },
-  }[type];
+    document: { bg: "bg-cyan-muted", border: "border-cyan/15", color: "text-cyan", Icon: FileText },
+    image: { bg: "bg-amber-muted", border: "border-amber/15", color: "text-amber", Icon: Image },
+  };
+  const c = config[type] || config.text;
 
   return (
-    <div className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 ${config.bg} ${config.border}`}>
-      <config.Icon className={`w-5 h-5 ${config.color}`} strokeWidth={1.5} />
+    <div className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 ${c.bg} ${c.border}`}>
+      <c.Icon className={`w-5 h-5 ${c.color}`} strokeWidth={1.5} />
     </div>
   );
 }

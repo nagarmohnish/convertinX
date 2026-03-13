@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { getAuthHeaders } from "../utils/api";
 
 interface UploadResult {
   job_id: string;
@@ -13,6 +14,7 @@ export function useUpload() {
     file: File,
     targetLanguages: string[],
     sourceLanguage: string | null,
+    singingMode: boolean = false,
   ): Promise<UploadResult> => {
     setUploading(true);
     setUploadProgress(0);
@@ -22,6 +24,9 @@ export function useUpload() {
     formData.append("target_languages", JSON.stringify(targetLanguages));
     if (sourceLanguage) {
       formData.append("source_language", sourceLanguage);
+    }
+    if (singingMode) {
+      formData.append("singing_mode", "true");
     }
 
     return new Promise((resolve, reject) => {
@@ -54,6 +59,11 @@ export function useUpload() {
       };
 
       xhr.open("POST", "/api/upload");
+      // Attach auth token if logged in
+      const headers = getAuthHeaders();
+      for (const [key, value] of Object.entries(headers)) {
+        xhr.setRequestHeader(key, value);
+      }
       xhr.send(formData);
     });
   };

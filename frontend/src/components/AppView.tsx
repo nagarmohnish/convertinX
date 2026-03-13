@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Upload, Languages, Rocket, Check, RotateCcw, AlertCircle } from "lucide-react";
+import { Upload, Languages, Rocket, Check, RotateCcw, AlertCircle, Music } from "lucide-react";
 import Layout from "./Layout";
 import UploadZone from "./UploadZone";
 import LanguageSelector from "./LanguageSelector";
@@ -18,6 +18,7 @@ export default function AppView({ onBack }: AppViewProps) {
   const [file, setFile] = useState<File | null>(null);
   const [sourceLanguage, setSourceLanguage] = useState<string | null>(null);
   const [targetLanguages, setTargetLanguages] = useState<string[]>([]);
+  const [singingMode, setSingingMode] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +50,7 @@ export default function AppView({ onBack }: AppViewProps) {
     setJob(null);
     setJobId(null);
     try {
-      const result = await submitJob(file, targetLanguages, sourceLanguage);
+      const result = await submitJob(file, targetLanguages, sourceLanguage, singingMode);
       setJobId(result.job_id);
     } catch (e: any) {
       setJobId(null);
@@ -59,12 +60,13 @@ export default function AppView({ onBack }: AppViewProps) {
           : e.message || "Failed to submit job"
       );
     }
-  }, [file, targetLanguages, sourceLanguage, submitJob]);
+  }, [file, targetLanguages, sourceLanguage, singingMode, submitJob]);
 
   const handleReset = () => {
     setFile(null);
     setSourceLanguage(null);
     setTargetLanguages([]);
+    setSingingMode(false);
     setJobId(null);
     setJob(null);
     setError(null);
@@ -72,8 +74,21 @@ export default function AppView({ onBack }: AppViewProps) {
 
   const handleClearFile = () => {
     setFile(null);
+    setSingingMode(false);
     setError(null);
   };
+
+  // Detect if file is audio (for showing song mode toggle)
+  const isAudioFile = file && /\.(mp3|wav|ogg|flac|m4a|aac)$/i.test(file.name);
+
+  // Auto-enable song mode when an audio file is selected
+  useEffect(() => {
+    if (isAudioFile) {
+      setSingingMode(true);
+    } else {
+      setSingingMode(false);
+    }
+  }, [isAudioFile]);
 
   const isProcessing = uploading || (job && (job.status === "queued" || job.status === "processing"));
   const jobStatus: JobStatus = job?.status ?? "queued";
@@ -103,6 +118,59 @@ export default function AppView({ onBack }: AppViewProps) {
             disabled={!!isProcessing}
           />
         </StepSection>
+
+        {/* Song Mode toggle (audio files only) */}
+        {isAudioFile && !jobId && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.3 }}
+            className="rounded-2xl bg-surface/60 border border-border overflow-hidden"
+          >
+            <button
+              type="button"
+              onClick={() => !isProcessing && setSingingMode(!singingMode)}
+              disabled={!!isProcessing}
+              className="w-full px-5 py-4 flex items-center gap-4 text-left transition-colors hover:bg-surface-2/30 disabled:opacity-40"
+            >
+              <div className={`
+                w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 transition-all duration-300
+                ${singingMode
+                  ? "bg-accent-muted border-accent/25"
+                  : "bg-surface-2 border-border"
+                }
+              `}>
+                <Music className={`w-4.5 h-4.5 transition-colors ${singingMode ? "text-accent-2" : "text-text-4"}`} strokeWidth={1.5} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`text-[14px] font-semibold transition-colors ${singingMode ? "text-text-1" : "text-text-2"}`}>
+                  Song Mode
+                </p>
+                <p className="text-[12px] text-text-4 mt-0.5">
+                  Keep original music, translate only the lyrics
+                </p>
+              </div>
+              {/* Toggle switch */}
+              <div className={`
+                relative w-11 h-6 rounded-full shrink-0 transition-colors duration-300
+                ${singingMode ? "bg-accent" : "bg-surface-3"}
+              `}>
+                <div className={`
+                  absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-300
+                  ${singingMode ? "translate-x-[22px]" : "translate-x-0.5"}
+                `} />
+              </div>
+            </button>
+            {singingMode && (
+              <div className="px-5 pb-3 -mt-1">
+                <p className="text-[11px] text-text-4 leading-relaxed">
+                  Uses Demucs AI to separate vocals from instrumentals, translates the lyrics,
+                  then mixes translated speech over the original music.
+                </p>
+              </div>
+            )}
+          </motion.div>
+        )}
 
         {/* Step 2: Languages */}
         <StepSection

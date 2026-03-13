@@ -9,6 +9,8 @@ from app.config import settings
 TEXT_EXTENSIONS = {".txt", ".srt", ".vtt", ".md", ".html", ".json"}
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac"}
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
+DOCUMENT_EXTENSIONS = {".pdf", ".docx", ".doc", ".pptx", ".ppt"}
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff"}
 
 
 def detect_content_type(filename: str) -> ContentType | None:
@@ -23,6 +25,10 @@ def detect_content_type(filename: str) -> ContentType | None:
         return ContentType.AUDIO
     if ext in VIDEO_EXTENSIONS:
         return ContentType.VIDEO
+    if ext in DOCUMENT_EXTENSIONS:
+        return ContentType.DOCUMENT
+    if ext in IMAGE_EXTENSIONS:
+        return ContentType.IMAGE
     return None
 
 

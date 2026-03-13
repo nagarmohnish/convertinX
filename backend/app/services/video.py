@@ -1,5 +1,6 @@
 import asyncio
 from pathlib import Path
+from app.config import settings
 from app.utils.file_utils import get_job_output_dir
 
 
@@ -9,7 +10,7 @@ async def extract_audio(video_path: str, job_id: str) -> str:
     output_path = output_dir / "extracted_audio.wav"
 
     cmd = [
-        "ffmpeg", "-y",
+        settings.ffmpeg_path, "-y",
         "-i", video_path,
         "-vn",
         "-acodec", "pcm_s16le",
@@ -50,7 +51,7 @@ async def burn_subtitles_and_replace_audio(
     subtitle_filter_path = subtitle_filter_path.replace(":", "\\:")
 
     cmd = [
-        "ffmpeg", "-y",
+        settings.ffmpeg_path, "-y",
         "-i", original_video,
         "-i", dubbed_audio,
         "-filter_complex",

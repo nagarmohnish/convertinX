@@ -1,33 +1,37 @@
-import { useState, useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
 import LandingPage from "./components/landing/LandingPage";
-import AppView from "./components/AppView";
+import ToolHubPage from "./pages/ToolHubPage";
+import TranslatePage from "./pages/TranslatePage";
+import TTSPage from "./pages/TTSPage";
+import STTPage from "./pages/STTPage";
+import AudioSeparatePage from "./pages/AudioSeparatePage";
+import DocTranslatePage from "./pages/DocTranslatePage";
+import ImageOCRPage from "./pages/ImageOCRPage";
+import DashboardPage from "./pages/DashboardPage";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
 
 export default function App() {
-  const [view, setView] = useState<"landing" | "app">(() =>
-    window.location.hash === "#app" ? "app" : "landing"
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/app" element={<ToolHubPage />} />
+          <Route path="/app/translate" element={<TranslatePage />} />
+          <Route path="/app/tts" element={<TTSPage />} />
+          <Route path="/app/stt" element={<STTPage />} />
+          <Route path="/app/audio-separate" element={<AudioSeparatePage />} />
+          <Route path="/app/doc-translate" element={<DocTranslatePage />} />
+          <Route path="/app/image-ocr" element={<ImageOCRPage />} />
+          <Route path="/app/dashboard" element={<DashboardPage />} />
+          {/* Redirect old hash route */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
-
-  useEffect(() => {
-    const handleHash = () => {
-      setView(window.location.hash === "#app" ? "app" : "landing");
-    };
-    window.addEventListener("hashchange", handleHash);
-    return () => window.removeEventListener("hashchange", handleHash);
-  }, []);
-
-  const goToApp = () => {
-    window.location.hash = "#app";
-    window.scrollTo(0, 0);
-  };
-
-  const goToLanding = () => {
-    window.location.hash = "";
-    window.scrollTo(0, 0);
-  };
-
-  if (view === "app") {
-    return <AppView onBack={goToLanding} />;
-  }
-
-  return <LandingPage onLaunchApp={goToApp} />;
 }

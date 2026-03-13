@@ -31,10 +31,11 @@ function resolveActiveStep(
   if (jobStatus === "failed") return -1;
 
   const step = wsStep?.toLowerCase() ?? "";
-  if (step.includes("transcrib")) return 1;
+  if (step.includes("separat") || step.includes("demucs")) return 1;
+  if (step.includes("transcrib") || step.includes("lyric")) return 1;
   if (step.includes("translat")) return 2;
-  if (step.includes("synthe") || step.includes("tts") || step.includes("dub") || step.includes("speech")) return 3;
-  if (step.includes("final") || step.includes("burn") || step.includes("merg") || step.includes("assembl") || step.includes("render")) return 4;
+  if (step.includes("synthe") || step.includes("tts") || step.includes("dub") || step.includes("speech") || step.includes("vocal track") || step.includes("generat")) return 3;
+  if (step.includes("final") || step.includes("burn") || step.includes("merg") || step.includes("assembl") || step.includes("render") || step.includes("mixing") || step.includes("instrumental")) return 4;
   if (step.includes("upload")) return 0;
   if (step.includes("extract")) return 0;
 

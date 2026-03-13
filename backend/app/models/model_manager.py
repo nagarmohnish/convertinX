@@ -13,9 +13,11 @@ class ModelManager:
 
     def __init__(self):
         self._whisper_model = None
+        self._demucs_model = None
         self._translation_models: dict[str, tuple] = {}
         self._lock = threading.Lock()
         self._whisper_lock = threading.Lock()
+        self._demucs_lock = threading.Lock()
 
     def get_whisper(self):
         """Load Whisper on first use and cache it."""
@@ -29,6 +31,21 @@ class ModelManager:
                     )
                     print("Whisper model loaded.")
         return self._whisper_model
+
+    def get_demucs(self):
+        """Load Demucs htdemucs model on first use and cache it."""
+        if self._demucs_model is None:
+            with self._demucs_lock:
+                if self._demucs_model is None:
+                    from demucs.pretrained import get_model
+                    import torch
+                    print("Loading Demucs model: htdemucs...")
+                    model = get_model("htdemucs")
+                    device = "cuda" if torch.cuda.is_available() else "cpu"
+                    model.to(device)
+                    self._demucs_model = model
+                    print(f"Demucs model loaded on {device}.")
+        return self._demucs_model
 
     def get_translation_model(self, src_lang: str, tgt_lang: str):
         """
@@ -82,4 +99,5 @@ class ModelManager:
     def unload_all(self):
         """Free all loaded models."""
         self._whisper_model = None
+        self._demucs_model = None
         self._translation_models.clear()
