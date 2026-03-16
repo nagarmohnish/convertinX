@@ -11,6 +11,18 @@ export const LANGUAGES: Language[] = [
   { code: "pt", name: "Portuguese", flag: "PT" },
   { code: "zh", name: "Chinese", flag: "ZH" },
   { code: "ko", name: "Korean", flag: "KO" },
+  { code: "it", name: "Italian", flag: "IT" },
+  { code: "ru", name: "Russian", flag: "RU" },
+  { code: "tr", name: "Turkish", flag: "TR" },
+  { code: "nl", name: "Dutch", flag: "NL" },
+  { code: "pl", name: "Polish", flag: "PL" },
+  { code: "sv", name: "Swedish", flag: "SV" },
+  { code: "vi", name: "Vietnamese", flag: "VI" },
+  { code: "th", name: "Thai", flag: "TH" },
+  { code: "id", name: "Indonesian", flag: "ID" },
+  { code: "uk", name: "Ukrainian", flag: "UK" },
+  { code: "el", name: "Greek", flag: "EL" },
+  { code: "cs", name: "Czech", flag: "CS" },
 ];
 
 export function getLanguageName(code: string): string {

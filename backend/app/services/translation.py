@@ -23,12 +23,16 @@ def translate_text(
 def _translate_single(
     text: str, src: str, tgt: str, model_manager: ModelManager
 ) -> str:
-    model, tokenizer, is_mbart = model_manager.get_translation_model(src, tgt)
+    model, tokenizer, engine = model_manager.get_translation_model(src, tgt)
 
-    if is_mbart:
+    if engine == "opus":
+        return _translate_opus(text, model, tokenizer)
+    elif engine == "nllb":
+        return _translate_nllb(text, src, tgt, model, tokenizer)
+    elif engine == "mbart":
         return _translate_mbart(text, src, tgt, model, tokenizer)
     else:
-        return _translate_opus(text, model, tokenizer)
+        raise ValueError(f"Unknown translation engine: {engine}")
 
 
 def _translate_opus(text: str, model, tokenizer) -> str:
@@ -41,6 +45,29 @@ def _translate_opus(text: str, model, tokenizer) -> str:
             chunk, return_tensors="pt", padding=True, truncation=True, max_length=512
         )
         output = model.generate(**inputs)
+        translated = tokenizer.decode(output[0], skip_special_tokens=True)
+        translated_chunks.append(translated)
+
+    return " ".join(translated_chunks)
+
+
+def _translate_nllb(text: str, src: str, tgt: str, model, tokenizer) -> str:
+    """Translate using NLLB-200."""
+    src_nllb = LANGUAGES[src]["nllb_code"]
+    tgt_nllb = LANGUAGES[tgt]["nllb_code"]
+    tokenizer.src_lang = src_nllb
+
+    chunks = _split_text_into_chunks(text, tokenizer, max_tokens=512)
+    translated_chunks = []
+
+    for chunk in chunks:
+        inputs = tokenizer(
+            chunk, return_tensors="pt", padding=True, truncation=True, max_length=512
+        )
+        tgt_lang_id = tokenizer.convert_tokens_to_ids(tgt_nllb)
+        output = model.generate(
+            **inputs, forced_bos_token_id=tgt_lang_id, max_length=512
+        )
         translated = tokenizer.decode(output[0], skip_special_tokens=True)
         translated_chunks.append(translated)
 

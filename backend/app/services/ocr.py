@@ -37,6 +37,18 @@ EASYOCR_LANG_MAP = {
     "pt": "pt",
     "zh": "ch_sim",
     "ko": "ko",
+    "it": "it",
+    "ru": "ru",
+    "tr": "tr",
+    "nl": "nl",
+    "pl": "pl",
+    "sv": "sv",
+    "vi": "vi",
+    "th": "th",
+    "id": "id",
+    "uk": "uk",
+    "el": "el",
+    "cs": "cs",
 }
 
 

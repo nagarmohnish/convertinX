@@ -81,20 +81,64 @@ def _select_font_for_text(text: str) -> dict:
 
 
 def extract_text_from_pdf(file_path: str) -> list[dict]:
-    """Extract text blocks from a PDF, preserving page structure.
-    Returns list of {page, text, bbox} dicts.
+    """Extract text from a PDF at span level, preserving font metadata.
+
+    Returns list of dicts per text block:
+    {
+        "page": int,
+        "block_bbox": (x0, y0, x1, y1),
+        "text": str,            # concatenated text from all spans (for translation)
+        "spans": [              # individual spans with formatting info
+            {
+                "text": str,
+                "bbox": (x0, y0, x1, y1),
+                "font": str,
+                "size": float,
+                "color": int,
+                "flags": int,   # 2=italic, 16=bold
+            }
+        ]
+    }
     """
     doc = fitz.open(file_path)
     blocks = []
+
     for page_num, page in enumerate(doc):
-        for block in page.get_text("blocks"):
-            x0, y0, x1, y1, text, block_no, block_type = block
-            if block_type == 0 and text.strip():  # text block
+        page_dict = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)
+
+        for block in page_dict["blocks"]:
+            if block["type"] != 0:  # skip image blocks
+                continue
+
+            block_spans = []
+            block_text_parts = []
+
+            for line in block["lines"]:
+                line_texts = []
+                for span in line["spans"]:
+                    text = span["text"]
+                    if not text.strip():
+                        continue
+                    block_spans.append({
+                        "text": text,
+                        "bbox": tuple(span["bbox"]),
+                        "font": span["font"],
+                        "size": span["size"],
+                        "color": span["color"],
+                        "flags": span["flags"],
+                    })
+                    line_texts.append(text.strip())
+                if line_texts:
+                    block_text_parts.append(" ".join(line_texts))
+
+            if block_spans:
                 blocks.append({
                     "page": page_num,
-                    "text": text.strip(),
-                    "bbox": (x0, y0, x1, y1),
+                    "block_bbox": tuple(block["bbox"]),
+                    "text": " ".join(block_text_parts),
+                    "spans": block_spans,
                 })
+
     doc.close()
     return blocks
 
@@ -138,12 +182,133 @@ def extract_text_from_pptx(file_path: str) -> list[dict]:
     return blocks
 
 
+def _int_to_rgb(color_int: int) -> tuple:
+    """Convert PyMuPDF integer color to (r, g, b) floats 0-1."""
+    r = ((color_int >> 16) & 0xFF) / 255.0
+    g = ((color_int >> 8) & 0xFF) / 255.0
+    b = (color_int & 0xFF) / 255.0
+    return (r, g, b)
+
+
+# Map common PDF font families to system font variants: (regular, bold, italic, bold-italic)
+_FONT_VARIANTS = {
+    "arial": ("arial.ttf", "arialbd.ttf", "ariali.ttf", "arialbi.ttf"),
+    "times": ("times.ttf", "timesbd.ttf", "timesi.ttf", "timesbi.ttf"),
+    "segoe": ("segoeui.ttf", "segoeuib.ttf", "segoeuii.ttf", "segoeuiz.ttf"),
+    "calibri": ("calibri.ttf", "calibrib.ttf", "calibrii.ttf", "calibriz.ttf"),
+    "cambria": ("cambria.ttc", "cambriab.ttf", "cambriai.ttf", "cambriaz.ttf"),
+    "verdana": ("verdana.ttf", "verdanab.ttf", "verdanai.ttf", "verdanaz.ttf"),
+    "tahoma": ("tahoma.ttf", "tahomabd.ttf", "tahoma.ttf", "tahomabd.ttf"),
+}
+
+
+def _select_font_for_span(text: str, original_font: str, is_bold: bool, is_italic: bool) -> dict:
+    """Select font for a span, trying to match the original font's bold/italic variant."""
+    orig_lower = original_font.lower()
+    for family, variants in _FONT_VARIANTS.items():
+        if family in orig_lower:
+            idx = (2 if is_italic else 0) + (1 if is_bold else 0)
+            font_file = _find_font(variants[idx])
+            if font_file:
+                return {"fontfile": font_file, "fontname": f"f{family}{idx}"}
+    # Fall back to script-based selection
+    return _select_font_for_text(text)
+
+
+def _split_at_word_boundary(text: str, target_chars: int) -> tuple:
+    """Split text near target_chars at the nearest word boundary."""
+    if target_chars >= len(text):
+        return text, ""
+
+    search_start = max(0, int(target_chars * 0.8))
+    search_end = min(len(text), int(target_chars * 1.2))
+
+    best_split = target_chars
+    for i in range(search_start, search_end):
+        if text[i] == " ":
+            best_split = i
+            break
+
+    return text[:best_split].rstrip(), text[best_split:].lstrip()
+
+
+def _insert_translated_spans(page, original_spans: list[dict], translated_text: str):
+    """Distribute translated text across original span bboxes, preserving formatting."""
+    total_original_chars = sum(len(s["text"]) for s in original_spans)
+    if total_original_chars == 0:
+        return
+
+    remaining_text = translated_text
+    for i, span in enumerate(original_spans):
+        is_last = (i == len(original_spans) - 1)
+
+        if is_last:
+            span_text = remaining_text
+        else:
+            proportion = len(span["text"]) / total_original_chars
+            char_count = max(1, round(proportion * len(translated_text)))
+            span_text, remaining_text = _split_at_word_boundary(remaining_text, char_count)
+
+        if not span_text.strip():
+            continue
+
+        bbox = fitz.Rect(span["bbox"])
+        fontsize = span["size"]
+        color = _int_to_rgb(span["color"])
+        is_bold = bool(span["flags"] & 16)
+        is_italic = bool(span["flags"] & 2)
+
+        font_info = _select_font_for_span(span_text, span["font"], is_bold, is_italic)
+
+        kwargs = dict(
+            rect=bbox,
+            buffer=span_text,
+            fontsize=fontsize,
+            align=fitz.TEXT_ALIGN_LEFT,
+            color=color,
+            **font_info,
+        )
+
+        rc = page.insert_textbox(**kwargs)
+
+        # Text overflow: progressively reduce font size
+        if rc < 0:
+            for scale in (0.8, 0.65, 0.5):
+                kwargs["fontsize"] = max(4, fontsize * scale)
+                rc = page.insert_textbox(**kwargs)
+                if rc >= 0:
+                    break
+
+
+def _insert_block_fallback(page, block: dict):
+    """Fallback insertion for blocks without span info (backward compatibility)."""
+    bbox = fitz.Rect(block.get("block_bbox", block.get("bbox", (0, 0, 100, 20))))
+    text = block["text"]
+    line_count = max(1, text.count("\n") + 1)
+    fontsize = min(11, max(6, bbox.height / line_count * 0.7))
+
+    font_info = _select_font_for_text(text)
+    kwargs = dict(
+        rect=bbox,
+        buffer=text,
+        fontsize=fontsize,
+        align=fitz.TEXT_ALIGN_LEFT,
+        color=(0, 0, 0),
+        **font_info,
+    )
+    rc = page.insert_textbox(**kwargs)
+    if rc < 0:
+        kwargs["fontsize"] = max(5, fontsize * 0.65)
+        page.insert_textbox(**kwargs)
+
+
 def rebuild_pdf(
     original_path: str,
     translated_blocks: list[dict],
     output_path: str,
 ):
-    """Create a translated PDF by redacting original text and inserting translations."""
+    """Create a translated PDF by redacting and reinserting at span level,
+    preserving original font, size, color, and bold/italic formatting."""
     doc = fitz.open(original_path)
 
     # Group blocks by page
@@ -154,35 +319,28 @@ def rebuild_pdf(
     for page_num, blocks in pages_blocks.items():
         page = doc[page_num]
 
-        # Step 1: Redact original text (properly removes it)
+        # Step 1: Redact all original text spans (collect all, then apply once per page)
         for block in blocks:
-            bbox = fitz.Rect(block["bbox"])
-            page.add_redact_annot(bbox, fill=(1, 1, 1))
+            spans = block.get("spans", [])
+            if spans:
+                for span in spans:
+                    bbox = fitz.Rect(span["bbox"])
+                    page.add_redact_annot(bbox, fill=(1, 1, 1))
+            else:
+                # Fallback: use block_bbox or bbox
+                bbox = fitz.Rect(block.get("block_bbox", block.get("bbox", (0, 0, 100, 20))))
+                page.add_redact_annot(bbox, fill=(1, 1, 1))
         page.apply_redactions()
 
-        # Step 2: Insert translated text
+        # Step 2: Insert translated text preserving formatting
         for block in blocks:
-            bbox = fitz.Rect(block["bbox"])
-            text = block["text"]
-            line_count = max(1, text.count("\n") + 1)
-            fontsize = min(11, max(6, bbox.height / line_count * 0.7))
+            spans = block.get("spans", [])
+            translated_text = block["text"]
 
-            font_info = _select_font_for_text(text)
-            kwargs = dict(
-                rect=bbox,
-                buffer=text,
-                fontsize=fontsize,
-                align=fitz.TEXT_ALIGN_LEFT,
-                color=(0, 0, 0),
-                **font_info,
-            )
-
-            rc = page.insert_textbox(**kwargs)
-
-            # Text didn't fit — retry with smaller font
-            if rc < 0:
-                kwargs["fontsize"] = max(5, fontsize * 0.65)
-                page.insert_textbox(**kwargs)
+            if spans:
+                _insert_translated_spans(page, spans, translated_text)
+            else:
+                _insert_block_fallback(page, block)
 
     doc.save(output_path)
     doc.close()
